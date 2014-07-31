@@ -1,0 +1,83 @@
+[Some of this early essay is no longer accurate, of course]
+
+              South currently attempts to ignore ContentType,
+              as it's a whole pile of fail. -- Andrew Godwin
+
+The typical way of doing tagging with Django (with a shared Tag pool) involves
+the use of GenericForeignKeys, and is IMO simply awful.  sane_tags is intended
+to demonstrate a sane way of implementing a similar, easy to use, facility
+without ever needing to touch the mountain of fail that is ContentType and its
+GrosslyFake(Foreign)Key.
+
+And it's really simple to do it right!  All you give up is being able to add a
+tag to some model that you never thought would need tags - seems likely to be done
+by mistake from an over-accomodating interface, but I may not be the most
+impartial observer.  Each model that wants to participate in tagging has to add
+itself by doing something like this:
+
+        tags = ManyToManyField("SaneTag")
+
+A few options might make some queries easier by giving useful names, but they're
+not necessary.  [[ that's true, right? ]]  Maybe a SaneTagField will be provided,
+but at the moment it really doesn't seem necessary...  [[ could be handy, though ]]
+
+This directly allows you to get all of a tagged item's tags just as you'd expect
+
+        all_my_tags = item.tags.all()
+
+Going the other way, a SaneTag instance has methods for accessing the models which
+have links to that tag.  Immediately and as expected, there's the model-specific
+"reverse" accessor:
+
+        sane_tag.model_name_set.all()
+
+[[ in the following, [model_class,...] is actually any iterable yielding model_classes ]]
+
+But there are times when you might wish to get other types of linked models, so:
+
+        SaneTag.get_all() -> {model_class:[instance,...], ...}
+   or   SaneTag.get_all_of([model_class,...]) -> {model_class:[instance,...],...}
+
+These are potentially heavyweight operations, of course, since they have to fetch
+all those linked instances.  Internally that's done in only two queries per
+model_class, but it still can be overkill.  For example, maybe you just need to
+know how many there are:
+
+        sane_tag.model_name_set.count()
+
+        SaneTag.count_all() -> {model_class:count,...}
+        SaneTag.count_all_of([model_class,...]) - {model_class:count,...}
+
+count_all[_of] should require only one query per model_class, so a degenerate   ???
+count_all([my_model_class]) might be faster than the direct accessor?           ???
+[[ don't know why I thought that - count() becomes an SQL COUNT(*), doesn't it? ]]
+
+One other special case that is provided for optimizing some use cases returns
+a value for each of the requested models' instances, but it's a much lighter
+weight query providing only the FK values.  This is one query, with a result set
+that is expected to be a lot smaller than get_all*, for each model_class:
+
+        SaneTag.get_key_all() -> {model_class:[key,...],...}
+        SaneTag.get_key_all_of([model_class,...]) -> {model_class:[key,...],...}
+
+This may be a useful optimization if you need counts for other linked models
+as well as some, perhaps semi-random, instances drawn from the pool(s).  Think
+really fancy tag clouds, maybe.  Anyway, this is just exposing an intermediate
+step that get_all[_of] use.  No model_set_name version shown as I've not
+investigated how this would be done through the ORM yet...                      TODO ?
+
+Of course sometimes you want to work with multiple tags.  There are analogous
+methods available as SaneTag class methods.  There are the "tag objects" and
+each tagged models' interface, of course:
+
+        SaneTag.objects.all()
+        SaneTag.model_name_set.all()
+
+Somewhat preliminary...
+
+        SaneTag.get_ids({tag,...}) -> {tag_id,...}
+
+        SaneTag.get_linked_keys({tag,...}) -> {model_class:{key,...},...}
+
+[[ I need to ponder what types of lookups are needed here ]]
+
