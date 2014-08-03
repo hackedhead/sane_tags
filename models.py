@@ -73,7 +73,7 @@ class SaneTag(Model):
         return dict((ro.model, ro) for ro in related_objects)
 
     @classmethod
-    def _m2m_from_models(model_list):
+    def _m2m_from_models(self, model_list):
         """returns an ro_dict describing all the models in model_list
         -> {model_class: related_object} for all models in model_list
         RAISES ValueError if any of model_list are not found in m2m relations
@@ -127,3 +127,25 @@ class SaneTag(Model):
 
         return res
 
+    @classmethod
+    def _get_all_cotagged(self, the_thing):
+        """returns [(thing_id, tag_id)...] for all tags of all things which share one or
+        more tags with the_thing.
+
+        EXPERIMENTAL, want to record the query plan while it's fresh in mind
+
+        This is fancy cloud taggish and/or for similarity by tags.
+        """
+
+        thing_class = the_thing.__class__
+        the_ro = self._m2m_from_models([thing_class])[thing_class]
+        names = dict(zip(('table', 'tagid', 'thingid'), self._m2m_from_ro(the_ro)))
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT %(thingid)s,%(tagid)s FROM %(table)s WHERE %(thingid)s IN
+                (SELECT DISTINCT t1.%(thingid)s FROM %(table)s as t1 WHERE t1.%(tagid)s IN
+                (SELECT t2.%(tagid)s FROM %(table)s as t2 WHERE t2.%(thingid)s = %%s))""" % names,
+                [the_thing.pk])
+            res = cursor.fetchall()
+
+        return res
