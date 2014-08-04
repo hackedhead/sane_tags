@@ -143,12 +143,21 @@ class SaneTag(Model):
         thing_class = the_thing.__class__
         the_ro = self._m2m_from_models([thing_class])[thing_class]
         names = dict(zip(('table', 'tagid', 'thingid'), self._m2m_from_ro(the_ro)))
-        with connection.cursor() as cursor:
+
+        # cursors could be used as contect managers due to a quirk of implementation
+        # in Python prior to 2.6.  Proper support for cursor-is-context-manager was
+        # added in Django 1.7.  Aiiiieeeeeeeee!  No wonder it seemed to work when it
+        # felt like it!  Spelled out longhand for now...
+
+        cursor = connection.cursor()
+        try:
             cursor.execute(
                 """SELECT %(thingid)s,%(tagid)s FROM %(table)s WHERE %(thingid)s IN
                 (SELECT DISTINCT t1.%(thingid)s FROM %(table)s as t1 WHERE t1.%(tagid)s IN
                 (SELECT t2.%(tagid)s FROM %(table)s as t2 WHERE t2.%(thingid)s = %%s))""" % names,
                 [the_thing.pk])
             res = cursor.fetchall()
+        finally:
+            cursor.close()
 
         return res
