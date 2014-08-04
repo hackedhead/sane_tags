@@ -3,13 +3,16 @@ from __future__ import absolute_import
 from django.db import connection
 from django.db.models import CharField, Model, TextField
 
+from django.conf import settings
+NAME_LENGTH = int(getattr(settings, 'SANETAG_NAME_LENGTH', '40'))
+
 
 class SaneTag(Model):
 
     ### Fields and other normal Django parts ###
 
-    name = CharField(max_length=40)
-    namei = CharField(max_length=40, unique=True)
+    name = CharField(max_length=NAME_LENGTH)
+    namei = CharField(max_length=NAME_LENGTH, unique=True)
 
     def __str__(self):
         return self.name
