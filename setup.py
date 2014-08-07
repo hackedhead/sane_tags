@@ -10,5 +10,6 @@ setup(
     long_description=long_description,
     maintainer="hackedhead",
     maintainer_email="hackedhead@gmail.com",
-    url="https://github.com/hackedhead/sane_tags"
+    url="https://github.com/hackedhead/sane_tags",
+    packages=["sane_tags"]
     )
